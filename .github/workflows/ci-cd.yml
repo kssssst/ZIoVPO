@@ -1,0 +1,130 @@
+name: CI/CD Pipeline with TLS
+
+on:
+  push:
+    branches: [ main, Lab_6 ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: marketdb
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Create SSL directory structure
+        run: |
+          echo "Creating SSL directory for keystore..."
+          mkdir -p src/main/resources/ssl
+
+      - name: Generate keystore from secret
+        run: |
+          echo "Generating keystore from GitHub Secret..."
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/ssl/studentlab.p12
+          echo "Keystore file created successfully"
+          ls -la src/main/resources/ssl/
+          echo "Keystore size:" $(wc -c < src/main/resources/ssl/studentlab.p12) "bytes"
+
+      - name: Build with Maven
+        run: mvn -B clean compile
+
+      - name: Run tests
+        run: mvn -B test -Dspring.datasource.url=jdbc:postgresql://localhost:5432/marketdb -Dspring.datasource.username=postgres -Dspring.datasource.password=postgres
+
+      - name: Upload test reports
+        if: always()  # Загружаем даже если тесты упали
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports/
+            target/failsafe-reports/
+          retention-days: 7
+
+      - name: Package application with TLS
+        run: mvn -B package
+
+      - name: List target directory
+        run: ls -la target/
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: market-app-jar
+          path: target/*.jar
+          retention-days: 7
+
+      - name: Upload keystore artifact (for debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ssl-keystore
+          path: src/main/resources/ssl/
+          retention-days: 1
+
+  docker-build:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download JAR artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: market-app-jar
+          path: target/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/market-app:latest
+            ghcr.io/${{ github.repository_owner }}/market-app:${{ github.sha }}
+          build-args: |
+            KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
+          secrets: |
+            GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+
+      - name: Logout from GitHub Container Registry
+        run: docker logout ghcr.io
