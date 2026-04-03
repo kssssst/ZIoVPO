@@ -1,5 +1,6 @@
 package com.example.market.service;
 
+import com.example.market.signature.SigningService;
 import com.example.market.dto.license.*;
 import com.example.market.model.User;
 import com.example.market.model.license.*;
@@ -23,6 +24,7 @@ public class LicenseService {
     private final DeviceLicenseRepository deviceLicenseRepository;
     private final LicenseHistoryRepository licenseHistoryRepository;
     private final UserRepository userRepository;
+    private final SigningService signingService;
 
     public LicenseService(LicenseRepository licenseRepository,
                           ProductRepository productRepository,
@@ -30,7 +32,7 @@ public class LicenseService {
                           DeviceRepository deviceRepository,
                           DeviceLicenseRepository deviceLicenseRepository,
                           LicenseHistoryRepository licenseHistoryRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository, SigningService signingService) {
         this.licenseRepository = licenseRepository;
         this.productRepository = productRepository;
         this.licenseTypeRepository = licenseTypeRepository;
@@ -38,6 +40,7 @@ public class LicenseService {
         this.deviceLicenseRepository = deviceLicenseRepository;
         this.licenseHistoryRepository = licenseHistoryRepository;
         this.userRepository = userRepository;
+        this.signingService = signingService;
     }
 
     // Вспомогательный метод – получить текущего аутентифицированного пользователя

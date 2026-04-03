@@ -17,4 +17,8 @@ public class TicketResponse {
     public String getSignature() {
         return signature;
     }
+    public TicketResponse(Ticket ticket, String signature) {
+        this.ticket = ticket;
+        this.signature = signature;
+    }
 }
