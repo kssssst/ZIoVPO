@@ -49,3 +49,6 @@ src/main/resources/ssl/*
 
 # Root CA files
 market-ssl-certificates/
+private-key.pem
+temp.p12
+public.crt

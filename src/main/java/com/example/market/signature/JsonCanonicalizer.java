@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -20,7 +20,8 @@ public class JsonCanonicalizer {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
             .configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true)
-            .configure(SerializationFeature.INDENT_OUTPUT, false);
+            .configure(SerializationFeature.INDENT_OUTPUT, false)
+            .registerModule(new JavaTimeModule());
 
     public static byte[] canonicalize(Object object) throws IOException {
         JsonNode node = MAPPER.valueToTree(object);
