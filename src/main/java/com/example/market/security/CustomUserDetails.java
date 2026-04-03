@@ -1,10 +1,8 @@
 package com.example.market.security;
 
 import java.util.Collection;
-import java.util.Collections;
 
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import com.example.market.model.User;
@@ -19,7 +17,7 @@ public class CustomUserDetails implements UserDetails {
         this.id = user.getId();
         this.username = user.getEmail();
         this.password = user.getPassword();
-        this.authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + user.getRole()));
+        this.authorities = user.getAuthorities();
     }
 
     public Long getId() {

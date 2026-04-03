@@ -1,4 +1,4 @@
-package com.example.market.schedule;
+package com.example.market.controller.schedule;
 
 import com.example.market.service.TokenService;
 import org.springframework.scheduling.annotation.Scheduled;

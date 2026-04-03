@@ -33,23 +33,33 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf.disable())
                 .sessionManagement(session -> session
-                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
+                        // Публичные эндпоинты
                         .requestMatchers(
                                 "/",
-                    "/error",
+                                "/error",
                                 "/auth/**",
-                    "/actuator/health"
+                                "/actuator/health"
                         ).permitAll()
-                .requestMatchers("/api/users/me", "/api/users/sessions").authenticated()
+
+                        // Эндпоинты для работы с лицензиями
+                        .requestMatchers("/api/licenses/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/licenses/**").authenticated()
+
+                        // Пользовательские эндпоинты
+                        .requestMatchers("/api/users/me", "/api/users/sessions").authenticated()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
+
+                        // Все остальные API требуют аутентификации
                         .requestMatchers("/api/**").authenticated()
+
                         .anyRequest().authenticated()
                 )
-            .authenticationProvider(authenticationProvider())
+                .authenticationProvider(authenticationProvider())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

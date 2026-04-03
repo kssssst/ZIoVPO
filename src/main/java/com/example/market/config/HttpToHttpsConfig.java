@@ -9,10 +9,8 @@ import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactor
 import org.springframework.boot.web.servlet.server.ServletWebServerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Profile;
 
 @Configuration
-@Profile("ssl")  // Будет активен только при активном профиле "ssl"
 public class HttpToHttpsConfig {
 
     @Value("${server.http.port:8080}")
@@ -34,7 +32,6 @@ public class HttpToHttpsConfig {
                 context.addConstraint(securityConstraint);
             }
         };
-
         tomcat.addAdditionalTomcatConnectors(redirectConnector());
         return tomcat;
     }
