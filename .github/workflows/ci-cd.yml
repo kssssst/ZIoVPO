@@ -2,7 +2,7 @@ name: CI/CD Pipeline with TLS and Digital Signature
 
 on:
   push:
-    branches: [ main, Lab_2]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
 
@@ -60,14 +60,21 @@ jobs:
         run: mvn -B clean compile
 
       - name: Run tests
-        run: |
-          mvn -B test \
-            -Dspring.datasource.url=jdbc:postgresql://localhost:5432/marketdb \
-            -Dspring.datasource.username=postgres \
-            -Dspring.datasource.password=postgres \
-            -Dserver.ssl.key-store-password=${{ secrets.KEYSTORE_PASSWORD }} \
-            -Dsignature.key-store-password=${{ secrets.SIGNING_KEYSTORE_PASSWORD }} \
-            -Dsignature.key-password=${{ secrets.SIGNING_KEY_PASSWORD }}
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/marketdb
+          DB_USER: postgres
+          DB_PASSWORD: postgres
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+          SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_ACCESS_EXPIRATION: ${{ secrets.JWT_ACCESS_EXPIRATION }}
+          JWT_REFRESH_EXPIRATION: ${{ secrets.JWT_REFRESH_EXPIRATION }}
+          JWT_ISSUER: ${{ secrets.JWT_ISSUER }}
+          SERVER_PORT: 8443
+          SECURITY_LOG_LEVEL: INFO
+          APP_SECURITY_LOG_LEVEL: DEBUG
+        run: mvn -B test
 
       - name: Upload test reports
         if: always()
