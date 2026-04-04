@@ -2,7 +2,7 @@ name: CI/CD Pipeline with TLS and Digital Signature
 
 on:
   push:
-    branches: [ main, Lab_1]
+    branches: [ main, Lab_2]
   pull_request:
     branches: [ main ]
 
