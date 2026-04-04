@@ -1,13 +1,15 @@
-name: CI/CD Pipeline with TLS
+name: CI/CD Pipeline with TLS and Digital Signature
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, Lab_1]
   pull_request:
     branches: [ main ]
 
 env:
   KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+  SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+  SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
 
 jobs:
   build-and-test:
@@ -39,26 +41,36 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Create SSL directory structure
+      - name: Create directories for keystores
         run: |
-          echo "Creating SSL directory for keystore..."
           mkdir -p src/main/resources/ssl
+          mkdir -p src/main/resources/certificates
 
+      - name: Generate HTTPS keystore from secret
         run: |
-          echo "Generating keystore from GitHub Secret..."
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/ssl/studentlab.p12
-          echo "Keystore file created successfully"
           ls -la src/main/resources/ssl/
-          echo "Keystore size:" $(wc -c < src/main/resources/ssl/studentlab.p12) "bytes"
+
+      - name: Generate signing keystore from secret
+        run: |
+          echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/certificates/signing.jks
+          ls -la src/main/resources/certificates/
 
       - name: Build with Maven
         run: mvn -B clean compile
 
       - name: Run tests
-        run: mvn -B test -Dspring.datasource.url=jdbc:postgresql://localhost:5432/marketdb -Dspring.datasource.username=postgres -Dspring.datasource.password=postgres
+        run: |
+          mvn -B test \
+            -Dspring.datasource.url=jdbc:postgresql://localhost:5432/marketdb \
+            -Dspring.datasource.username=postgres \
+            -Dspring.datasource.password=postgres \
+            -Dserver.ssl.key-store-password=${{ secrets.KEYSTORE_PASSWORD }} \
+            -Dsignature.key-store-password=${{ secrets.SIGNING_KEYSTORE_PASSWORD }} \
+            -Dsignature.key-password=${{ secrets.SIGNING_KEY_PASSWORD }}
 
       - name: Upload test reports
-        if: always()  # Загружаем даже если тесты упали
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
@@ -67,7 +79,7 @@ jobs:
             target/failsafe-reports/
           retention-days: 7
 
-      - name: Package application with TLS
+      - name: Package application with TLS and signature
         run: mvn -B package
 
       - name: List target directory
@@ -79,13 +91,6 @@ jobs:
           name: market-app-jar
           path: target/*.jar
           retention-days: 7
-
-      - name: Upload keystore artifact (for debugging)
-        uses: actions/upload-artifact@v4
-        with:
-          name: ssl-keystore
-          path: src/main/resources/ssl/
-          retention-days: 1
 
   docker-build:
     needs: build-and-test
@@ -122,6 +127,8 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/market-app:${{ github.sha }}
           build-args: |
             KEYSTORE_PASSWORD=${{ secrets.KEYSTORE_PASSWORD }}
+            SIGNING_KEYSTORE_PASSWORD=${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
+            SIGNING_KEY_PASSWORD=${{ secrets.SIGNING_KEY_PASSWORD }}
           secrets: |
             GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
 
