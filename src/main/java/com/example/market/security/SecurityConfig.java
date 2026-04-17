@@ -56,7 +56,7 @@ public class SecurityConfig {
 
                         // Все остальные API требуют аутентификации
                         .requestMatchers("/api/**").authenticated()
-
+                        .requestMatchers("/api/signatures/**").authenticated()
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
