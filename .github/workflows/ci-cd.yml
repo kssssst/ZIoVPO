@@ -60,7 +60,7 @@ jobs:
           SERVER_PORT: 8443
           SECURITY_LOG_LEVEL: INFO
           APP_SECURITY_LOG_LEVEL: DEBUG
-        run: mvn -B test -Dspring.profiles.active=ssl -Dtest=!MarketApplicationTests
+        run: mvn -B test -Dspring.profiles.active=ssl -Dtest=!MarketApplicationTests -Dsurefire.failIfNoSpecifiedTests=false
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
