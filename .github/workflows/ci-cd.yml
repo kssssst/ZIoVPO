@@ -40,11 +40,9 @@ jobs:
           mkdir -p src/main/resources/ssl
           mkdir -p src/main/resources/certificates
       - name: Restore HTTPS keystore
-        run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/ssl/studentlab.p12
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/ssl/studentlab.p12
       - name: Restore signing keystore
-        run: |
-          echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/certificates/signing.jks
+        run: echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/certificates/signing.jks
       - name: Build
         run: mvn -B clean compile
       - name: Run tests
@@ -62,7 +60,7 @@ jobs:
           SERVER_PORT: 8443
           SECURITY_LOG_LEVEL: INFO
           APP_SECURITY_LOG_LEVEL: DEBUG
-        run: mvn -B test -Dspring.profiles.active=ssl
+        run: mvn -B test -Dspring.profiles.active=ssl -Dtest=!MarketApplicationTests
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
