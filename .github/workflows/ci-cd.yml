@@ -1,7 +1,7 @@
 name: CI Pipeline (Build and Test)
 
 on:
-  push:                         # запуск при пуше в любую ветку
+  push:
   pull_request:
     branches: [ main ]
 
@@ -13,7 +13,6 @@ env:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
     services:
       postgres:
         image: postgres:15
@@ -21,43 +20,33 @@ jobs:
           POSTGRES_DB: marketdb
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-        ports:
-          - 5432:5432
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
+      - uses: actions/checkout@v4
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
           cache: 'maven'
-
-      - name: Create directories for keystores
+      - name: Create keystore directories
         run: |
           mkdir -p src/main/resources/ssl
           mkdir -p src/main/resources/certificates
-
-      - name: Generate HTTPS keystore from secret
+      - name: Restore HTTPS keystore
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/ssl/studentlab.p12
-          ls -la src/main/resources/ssl/
-
-      - name: Generate signing keystore from secret
+      - name: Restore signing keystore
         run: |
           echo "${{ secrets.SIGNING_KEYSTORE_BASE64 }}" | base64 --decode > src/main/resources/certificates/signing.jks
-          ls -la src/main/resources/certificates/
-
-      - name: Build with Maven
+      - name: Build
         run: mvn -B clean compile
-
       - name: Run tests
         env:
           DB_URL: jdbc:postgresql://localhost:5432/marketdb
@@ -66,7 +55,6 @@ jobs:
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
           SIGNING_KEY_PASSWORD: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          SIGNATURE_KEY_STORE_PATH: classpath:certificates/signing.jks
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           JWT_ACCESS_EXPIRATION: ${{ secrets.JWT_ACCESS_EXPIRATION }}
           JWT_REFRESH_EXPIRATION: ${{ secrets.JWT_REFRESH_EXPIRATION }}
@@ -75,23 +63,16 @@ jobs:
           SECURITY_LOG_LEVEL: INFO
           APP_SECURITY_LOG_LEVEL: DEBUG
         run: mvn -B test -Dspring.profiles.active=ssl
-
       - name: Upload test reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-reports
-          path: |
-            target/surefire-reports/
-            target/failsafe-reports/
-          retention-days: 7
-
-      - name: Package application (skip tests)
+          path: target/surefire-reports/
+      - name: Package
         run: mvn -B package -DskipTests
-
-      - name: Upload JAR artifact
+      - name: Upload JAR
         uses: actions/upload-artifact@v4
         with:
           name: market-app-jar
           path: target/*.jar
-          retention-days: 7
