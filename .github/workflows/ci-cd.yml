@@ -1,7 +1,7 @@
 name: CI Pipeline (Build and Test)
 
 on:
-  push:
+  push:                         # запуск при пуше в любую ветку
   pull_request:
     branches: [ main ]
 
@@ -73,8 +73,7 @@ jobs:
           SERVER_PORT: 8443
           SECURITY_LOG_LEVEL: INFO
           APP_SECURITY_LOG_LEVEL: DEBUG
-          SPRING_PROFILES_ACTIVE: ssl
-        run: mvn -B test
+        run: mvn -B test -Dspring.profiles.active=ssl
 
       - name: Upload test reports
         if: always()
