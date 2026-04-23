@@ -15,21 +15,29 @@ public class SigningService {
         this.privateKey = keyStoreService.getPrivateKey();
     }
 
+    // Подпись объекта (JSON канонизация)
     public String sign(Object payload) {
         try {
-            // 1. Канонизация в UTF-8 байты
             byte[] canonicalBytes = JsonCanonicalizer.canonicalize(payload);
-
-            // 2. Подпись SHA256withRSA
             Signature signature = Signature.getInstance("SHA256withRSA");
             signature.initSign(privateKey);
             signature.update(canonicalBytes);
             byte[] signedBytes = signature.sign();
-
-            // 3. Base64 кодирование
             return Base64.getEncoder().encodeToString(signedBytes);
         } catch (Exception e) {
             throw new RuntimeException("Failed to sign payload", e);
+        }
+    }
+
+    // Подпись готового массива байт
+    public byte[] signBytes(byte[] data) {
+        try {
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initSign(privateKey);
+            signature.update(data);
+            return signature.sign();
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to sign byte array", e);
         }
     }
 }
