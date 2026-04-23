@@ -15,7 +15,10 @@ public class SigningService {
         this.privateKey = keyStoreService.getPrivateKey();
     }
 
-    // Подпись объекта (JSON канонизация)
+    // Подпись объектного payload.
+    //
+    // Этот метод используется для подписи самой сигнатуры при создании/изменении:
+    // объект сначала приводится к каноническому JSON, затем подписывается.
     public String sign(Object payload) {
         try {
             byte[] canonicalBytes = JsonCanonicalizer.canonicalize(payload);
@@ -29,7 +32,17 @@ public class SigningService {
         }
     }
 
-    // Подпись готового массива байт
+    // Требование: реализован метод, принимающий массив байт, в модуле формирования ЭЦП.
+    //
+    // Этот метод нужен именно для задания с manifest.bin.
+    // Манифест уже является готовой бинарной последовательностью header + entries,
+    // поэтому его нельзя заново канонизировать как JSON-объект.
+    //
+    // Принцип работы:
+    // 1. Создаем алгоритм SHA256withRSA.
+    // 2. Инициализируем подпись приватным ключом из keystore.
+    // 3. Передаем в алгоритм исходный byte[] манифеста.
+    // 4. Возвращаем сырые байты подписи, которые дописываются в конец manifest.bin.
     public byte[] signBytes(byte[] data) {
         try {
             Signature signature = Signature.getInstance("SHA256withRSA");

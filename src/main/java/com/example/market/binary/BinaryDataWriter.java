@@ -7,19 +7,30 @@ import java.util.UUID;
 
 /**
  * Утилита для записи примитивных типов в массив байт (Big‑Endian / network byte order).
- * Используется для формирования manifesto.bin и data.bin.
+ *
+ * Требование: реализован протокол приведения типов файла данных
+ * в бинарное представление.
+ *
+ * Все многобайтовые числа пишутся в Big-Endian: сначала старший байт,
+ * затем младшие. Такой порядок также называют network byte order.
+ * Благодаря этому клиент и сервер одинаково читают длины, смещения,
+ * времена и UUID независимо от платформы.
+ *
+ * Используется для формирования manifest.bin и data.bin.
  */
 public final class BinaryDataWriter {
 
     private BinaryDataWriter() {}
 
-    // Запись uint16 (2 байта)
+    // uint16: 2 байта, старший байт пишется первым.
+    // value >>> 8 берет старшие 8 бит, value & 0xFF берет младшие 8 бит.
     public static void writeUint16(ByteArrayOutputStream out, int value) {
         out.write((value >>> 8) & 0xFF);
         out.write(value & 0xFF);
     }
 
-    // Запись uint32 (4 байта)
+    // uint32: 4 байта в порядке 24, 16, 8, 0 бит.
+    // Так пишутся длины строк, длины byte[] и recordCount.
     public static void writeUint32(ByteArrayOutputStream out, long value) {
         out.write((int) ((value >>> 24) & 0xFF));
         out.write((int) ((value >>> 16) & 0xFF));
@@ -27,7 +38,8 @@ public final class BinaryDataWriter {
         out.write((int) (value & 0xFF));
     }
 
-    // Запись int64 (8 байт)
+    // int64: 8 байт в порядке 56, 48, 40, 32, 24, 16, 8, 0 бит.
+    // Используется для времени, offsetStart, offsetEnd и частей UUID.
     public static void writeInt64(ByteArrayOutputStream out, long value) {
         out.write((int) ((value >>> 56) & 0xFF));
         out.write((int) ((value >>> 48) & 0xFF));
@@ -39,19 +51,22 @@ public final class BinaryDataWriter {
         out.write((int) (value & 0xFF));
     }
 
-    // Запись массива байт с префиксом длины (uint32)
+    // byte[] переменной длины: сначала uint32 длина, затем сами байты.
+    // Клиент сначала читает длину, затем ровно столько байт содержимого.
     public static void writeBytesWithLength(ByteArrayOutputStream out, byte[] data) {
         writeUint32(out, data.length);
         out.writeBytes(data);
     }
 
-    // Запись строки UTF‑8 с префиксом длины (uint32)
+    // String: переводим строку в UTF-8, затем пишем как byte[] с длиной.
+    // Поэтому русские/латинские символы читаются одинаково корректно.
     public static void writeString(ByteArrayOutputStream out, String s) {
         byte[] bytes = s.getBytes(StandardCharsets.UTF_8);
         writeBytesWithLength(out, bytes);
     }
 
-    // Запись UUID (как два 64-битных поля)
+    // UUID пишется компактно не строкой, а двумя 64-битными числами:
+    // mostSignificantBits и leastSignificantBits.
     public static void writeUuid(ByteArrayOutputStream out, UUID uuid) {
         long most = uuid.getMostSignificantBits();
         long least = uuid.getLeastSignificantBits();

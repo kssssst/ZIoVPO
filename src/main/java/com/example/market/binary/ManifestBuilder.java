@@ -8,6 +8,9 @@ import java.util.List;
 
 /**
  * Собирает бинарный манифест: заголовок + массив записей + подпись манифеста.
+ *
+ * Этот класс относится к заданию по multipart/mixed API: manifest.bin является
+ * первой частью ответа и описывает, как читать вторую часть data.bin.
  */
 public class ManifestBuilder {
 
@@ -19,6 +22,13 @@ public class ManifestBuilder {
 
     /**
      * Построить manifest.bin массив байт.
+     *
+     * Принцип:
+     * 1. Записываем заголовок манифеста.
+     * 2. Записываем ровно recordCount записей ManifestEntry.
+     * 3. Берем получившийся неподписанный byte[] и подписываем его через signBytes().
+     * 4. В конец дописываем длину подписи и байты подписи.
+     *
      * @param header        заголовок манифеста
      * @param entries       список записей (ManifestEntry)
      * @return              байты manifest.bin
@@ -26,52 +36,60 @@ public class ManifestBuilder {
     public byte[] build(ManifestHeader header, List<ManifestEntry> entries) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
 
-        // 1. magic (как строка) – без префикса длины, просто байты
+        // Требование: заголовок манифеста содержит MAGIC NUMBER.
+        // magic пишется первым и без префикса длины, чтобы клиент сразу понял,
+        // что перед ним именно manifest.bin этого протокола.
         baos.writeBytes(header.magic.getBytes(java.nio.charset.StandardCharsets.US_ASCII));
 
-        // 2. version (uint16)
+        // version нужен для развития формата. Сейчас версия = 1.
         BinaryDataWriter.writeUint16(baos, header.version);
 
-        // 3. exportType (uint8)
+        // exportType: 0 - full, 1 - increment, 2 - by-ids.
         baos.write(header.exportType);
 
-        // 4. generatedAtEpochMillis (int64)
+        // generatedAtEpochMillis - время формирования пакета сервером.
         BinaryDataWriter.writeInt64(baos, header.generatedAtEpochMillis);
 
-        // 5. sinceEpochMillis (int64)
+        // sinceEpochMillis используется для инкремента; для остальных сценариев -1.
         BinaryDataWriter.writeInt64(baos, header.sinceEpochMillis);
 
-        // 6. recordCount (uint32)
+        // recordCount сообщает клиенту, сколько ManifestEntry нужно прочитать дальше.
         BinaryDataWriter.writeUint32(baos, header.recordCount);
 
-        // 7. dataSha256 (32 байта)
+        // dataSha256 - контрольная сумма всего data.bin.
         baos.writeBytes(header.dataSha256);
 
-        // 8. Массив записей
+        // Массив записей манифеста. Каждая запись связывает одну сигнатуру
+        // с ее байтовым диапазоном в data.bin и содержит подпись этой сигнатуры.
         for (ManifestEntry entry : entries) {
-            // id
+            // id пишется как два int64: mostSignificantBits и leastSignificantBits.
             BinaryDataWriter.writeUuid(baos, entry.id);
-            // statusCode
+            // statusCode: 0 = ACTUAL, 1 = DELETED.
             baos.write(entry.statusCode);
-            // updatedAtEpochMillis
+            // updatedAtEpochMillis нужен клиенту для сравнения версии записи.
             BinaryDataWriter.writeInt64(baos, entry.updatedAtEpochMillis);
-            // dataOffset
+            // dataOffset и dataLength задают диапазон байтов конкретной записи в data.bin.
             BinaryDataWriter.writeInt64(baos, entry.dataOffset);
-            // dataLength
             BinaryDataWriter.writeUint32(baos, entry.dataLength);
-            // recordSignatureLength (uint32)
+            // Подпись записи имеет переменную длину, поэтому сначала пишем uint32 length.
             BinaryDataWriter.writeUint32(baos, entry.recordSignature.length);
-            // recordSignatureBytes
             baos.writeBytes(entry.recordSignature);
         }
 
-        // 9. После записей – подпись манифеста: сначала длина (uint32), потом байты подписи
+        // Требование: корректно реализована ЭЦП манифеста.
+        //
+        // Подписывается не объект и не JSON, а именно готовая бинарная структура
+        // header + entries. Поэтому сначала получаем unsignedManifest как byte[].
         byte[] unsignedManifest = baos.toByteArray();
-        // ИСПРАВЛЕНО: используем signBytes(), возвращающий byte[]
+
+        // Требование: в модуле ЭЦП есть метод, принимающий массив байт.
+        // signBytes(byte[]) возвращает сырые байты RSA-подписи для manifest.bin.
         byte[] manifestSignature = signingService.signBytes(unsignedManifest);
 
         ByteArrayOutputStream finalBaos = new ByteArrayOutputStream();
         finalBaos.writeBytes(unsignedManifest);
+        // В конец manifest.bin кладем длину подписи и саму подпись.
+        // Клиент читает unsigned-часть, затем подпись и проверяет подлинность манифеста.
         BinaryDataWriter.writeUint32(finalBaos, manifestSignature.length);
         finalBaos.writeBytes(manifestSignature);
         return finalBaos.toByteArray();
